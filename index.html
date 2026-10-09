@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="es">
   <head>
@@ -474,15 +473,19 @@
             </div>
             <div class="metric">
               <strong id="previous-mean">-</strong>
-              <span>Media velocidad 5 días previos</span>
+              <span>Media velocidad semana anterior</span>
             </div>
             <div class="metric">
               <strong id="previous-gust">-</strong>
-              <span>Media racha 5 días previos</span>
+              <span>Media racha semana anterior</span>
             </div>
             <div class="metric">
               <strong id="previous-dir">-</strong>
-              <span>Dirección dominante 5 días previos</span>
+              <span>Dirección dominante semana anterior</span>
+            </div>
+            <div class="metric">
+              <strong id="weather-state">-</strong>
+              <span>Estado del tiempo del día</span>
             </div>
           </section>
 
@@ -494,11 +497,12 @@
                   <th>Velocidad</th>
                   <th>Racha</th>
                   <th>Dirección</th>
+                  <th>Tiempo</th>
                 </tr>
               </thead>
               <tbody id="hourly-table">
                 <tr>
-                  <td colspan="4">Sin consulta todavia.</td>
+                  <td colspan="5">Sin consulta todavia.</td>
                 </tr>
               </tbody>
             </table>
@@ -530,6 +534,7 @@
       const previousMeanText = document.querySelector("#previous-mean");
       const previousGustText = document.querySelector("#previous-gust");
       const previousDirText = document.querySelector("#previous-dir");
+      const weatherStateText = document.querySelector("#weather-state");
       const tableBody = document.querySelector("#hourly-table");
       const mapFrame = document.querySelector("#map-frame");
       const mapImage = document.querySelector("#map-image");
@@ -609,7 +614,7 @@
       function updateWindArrows(lat, lon, currentDirection, previousDirection) {
         const html = [
           arrowMarkup(currentDirection, "Hora", "current"),
-          arrowMarkup(previousDirection, "5 días", "previous")
+          arrowMarkup(previousDirection, "Semana", "previous")
         ].join("");
 
         windArrowPanel.innerHTML = html;
@@ -685,6 +690,33 @@
         return value === null || value === undefined || Number.isNaN(Number(value)) ? "-" : `${Number(value).toFixed(1)} km/h`;
       }
 
+      function weatherCodeLabel(code) {
+        const value = Number(code);
+        if (!Number.isFinite(value)) return "-";
+        if (value === 0) return "Despejado";
+        if ([1, 2, 3].includes(value)) return "Nuboso";
+        if ([45, 48].includes(value)) return "Niebla";
+        if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(value)) return "Lluvioso";
+        if ([71, 73, 75, 77, 85, 86].includes(value)) return "Nieve / granizo";
+        if ([95, 96, 99].includes(value)) return "Tormenta";
+        return "Variable";
+      }
+
+      function dailyWeatherLabel(data, dailyIndex, dayRows) {
+        const dailyCode = data.daily.weather_code?.[dailyIndex];
+        if (dailyCode !== null && dailyCode !== undefined) return weatherCodeLabel(dailyCode);
+
+        const precipitation = dayRows.map((row) => Number(data.hourly.precipitation?.[row.itemIndex]) || 0);
+        const cloudCover = dayRows.map((row) => Number(data.hourly.cloud_cover?.[row.itemIndex])).filter(Number.isFinite);
+        const totalPrecipitation = precipitation.reduce((total, value) => total + value, 0);
+        const meanCloudCover = average(cloudCover);
+
+        if (totalPrecipitation >= 1) return "Lluvioso";
+        if (meanCloudCover === null) return "-";
+        if (meanCloudCover < 25) return "Despejado";
+        return "Nuboso";
+      }
+
       function selectedPlaceName() {
         return currentPlaceName || "coordenadas propias";
       }
@@ -742,7 +774,8 @@
         previousMeanText.textContent = "-";
         previousGustText.textContent = "-";
         previousDirText.textContent = "-";
-        tableBody.innerHTML = '<tr><td colspan="4">Consultando...</td></tr>';
+        weatherStateText.textContent = "-";
+        tableBody.innerHTML = '<tr><td colspan="5">Consultando...</td></tr>';
       }
 
       function average(values) {
@@ -785,6 +818,7 @@
             <td>${formatSpeed(hourly.wind_speed_10m[index])}</td>
             <td>${formatSpeed(hourly.wind_gusts_10m[index])}</td>
             <td>${compassLabel(hourly.wind_direction_10m[index])}</td>
+            <td>${weatherCodeLabel(hourly.weather_code?.[index])}</td>
           `;
           tableBody.appendChild(row);
         });
@@ -854,15 +888,15 @@
 
         const selectedHour = hourInput.value;
         const selectedDate = dateInput.value;
-        const previousStartDate = addDaysIso(selectedDate, -5);
+        const previousStartDate = addDaysIso(selectedDate, -7);
         const apiUrl = new URL("https://archive-api.open-meteo.com/v1/archive");
         apiUrl.search = new URLSearchParams({
           latitude: latInput.value,
           longitude: lonInput.value,
           start_date: previousStartDate,
           end_date: selectedDate,
-          hourly: "wind_speed_10m,wind_direction_10m,wind_gusts_10m",
-          daily: "wind_speed_10m_max,wind_direction_10m_dominant,wind_gusts_10m_max",
+          hourly: "wind_speed_10m,wind_direction_10m,wind_gusts_10m,weather_code,precipitation,cloud_cover",
+          daily: "weather_code,precipitation_sum,wind_speed_10m_max,wind_direction_10m_dominant,wind_gusts_10m_max",
           timezone: "auto",
           wind_speed_unit: "kmh",
           cell_selection: cellSelectionInput.value
@@ -880,6 +914,9 @@
           const previousRows = data.hourly.time
             .map((time, itemIndex) => ({ time, itemIndex }))
             .filter((row) => row.time.slice(0, 10) >= previousStartDate && row.time.slice(0, 10) < selectedDate);
+          const dayRows = data.hourly.time
+            .map((time, itemIndex) => ({ time, itemIndex }))
+            .filter((row) => row.time.slice(0, 10) === selectedDate);
 
           const previousSpeeds = previousRows.map((row) => data.hourly.wind_speed_10m[row.itemIndex]);
           const previousGusts = previousRows.map((row) => data.hourly.wind_gusts_10m[row.itemIndex]);
@@ -896,13 +933,14 @@
           previousMeanText.textContent = formatSpeed(average(previousSpeeds));
           previousGustText.textContent = formatSpeed(average(previousGusts));
           previousDirText.textContent = compassLabel(previousDominantDirection);
+          weatherStateText.textContent = dailyWeatherLabel(data, dailyIndex, dayRows);
           updateMap();
           renderRows(data.hourly, selectedHour, selectedDate);
-          setStatus(`${selectedPlaceName()} - ${selectedDate} - ${selectedHour}:00 hora local. Media calculada con ${previousRows.length} horas de los 5 días anteriores.`);
+          setStatus(`${selectedPlaceName()} - ${selectedDate} - ${selectedHour}:00 hora local. Media calculada con ${previousRows.length} horas de la semana anterior.`);
           updatePermalink();
         } catch (error) {
           setStatus(`No se pudo consultar el viento: ${error.message}`, true);
-          tableBody.innerHTML = '<tr><td colspan="4">Sin datos.</td></tr>';
+          tableBody.innerHTML = '<tr><td colspan="5">Sin datos.</td></tr>';
         }
       }
 
