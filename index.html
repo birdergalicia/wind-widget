@@ -136,20 +136,60 @@
 
       .map-controls {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        gap: 16px;
         margin-bottom: 8px;
       }
 
-      .map-controls label {
+      .map-controls > label {
         width: min(240px, 100%);
+      }
+
+      .zoom-control {
+        flex: 1 1 280px;
+        min-width: 240px;
+      }
+
+      .zoom-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .zoom-head output {
+        font-weight: 400;
+      }
+
+      .zoom-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .zoom-row input[type="range"] {
+        flex: 1;
+        min-height: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+
+      .zoom-row button {
+        flex: none;
+        width: 38px;
+        padding: 0;
+        font-size: 20px;
+        line-height: 1;
       }
 
       .map-frame {
         position: relative;
         width: 100%;
-        height: 210px;
+        aspect-ratio: 3 / 1;
+        min-height: 150px;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: #eef4f8;
@@ -195,6 +235,17 @@
         border-radius: 999px;
         background: var(--accent);
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+      }
+
+      .map-credit {
+        position: absolute;
+        right: 6px;
+        bottom: 4px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.8);
+        color: var(--muted);
+        font-size: 10px;
       }
 
       .wind-arrow-row {
@@ -252,6 +303,7 @@
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
+        align-content: start;
       }
 
       .metric {
@@ -262,9 +314,7 @@
         background: #f9fbfd;
       }
 
-      .metric:nth-of-type(1),
-      .metric:nth-of-type(3),
-      .metric:nth-of-type(6) {
+      .metric.excel {
         border-left: 4px solid var(--accent);
       }
 
@@ -282,6 +332,15 @@
         font-size: 12px;
       }
 
+      .metric em {
+        display: block;
+        margin-top: 4px;
+        color: var(--accent-dark);
+        font-size: 12px;
+        font-style: normal;
+        font-weight: 700;
+      }
+
       .status {
         grid-column: 1 / -1;
         min-height: 20px;
@@ -296,7 +355,7 @@
       }
 
       .table-wrap {
-        max-height: 330px;
+        max-height: 520px;
         overflow: auto;
         border: 1px solid var(--line);
         border-radius: 8px;
@@ -335,9 +394,13 @@
 
       .footnote {
         margin: 0;
-        padding: 0 16px 14px;
+        padding: 0 16px 8px;
         color: var(--muted);
         font-size: 12px;
+      }
+
+      .footnote:last-of-type {
+        padding-bottom: 14px;
       }
 
       @media (max-width: 920px) {
@@ -364,6 +427,10 @@
 
         .summary {
           grid-template-columns: 1fr;
+        }
+
+        .map-frame {
+          aspect-ratio: 4 / 3;
         }
       }
     </style>
@@ -426,9 +493,9 @@
           <label>
             Celda
             <select id="cell-selection" required>
+              <option value="nearest">Más cercana</option>
               <option value="land">Tierra</option>
               <option value="sea">Mar</option>
-              <option value="nearest">Más cercana</option>
             </select>
           </label>
 
@@ -444,46 +511,72 @@
                 <option value="satellite">Satélite</option>
               </select>
             </label>
+
+            <label class="zoom-control" for="map-zoom">
+              <span class="zoom-head">
+                <span>Zoom del mapa</span>
+                <output id="zoom-info" for="map-zoom"></output>
+              </span>
+              <span class="zoom-row">
+                <button id="zoom-out" type="button" aria-label="Alejar el mapa" title="Alejar">&minus;</button>
+                <input id="map-zoom" type="range" min="8" max="17" step="1" value="13" aria-label="Nivel de zoom del mapa">
+                <button id="zoom-in" type="button" aria-label="Acercar el mapa" title="Acercar">+</button>
+              </span>
+            </label>
           </div>
           <div id="map-frame" class="map-frame" aria-label="Mapa de la ubicación seleccionada">
             <img id="map-image" class="map-image" alt="Mapa de la ubicación seleccionada">
             <div class="map-dot" aria-hidden="true"></div>
             <div id="wind-arrow-panel" class="wind-arrow-panel" aria-hidden="true"></div>
+            <div class="map-credit">Mapa base: Esri</div>
           </div>
         </div>
 
         <div class="results">
           <section class="summary" aria-live="polite">
             <p id="status" class="status">Elige fecha y lugar para consultar el viento.</p>
+
             <div class="metric">
               <strong id="wind-speed">-</strong>
-              <span>Velocidad a 10 m</span>
+              <span>Velocidad a la hora elegida (10 m)</span>
             </div>
             <div class="metric">
               <strong id="wind-gust">-</strong>
-              <span>Racha a 10 m</span>
+              <span>Racha a la hora elegida (10 m)</span>
             </div>
             <div class="metric">
               <strong id="wind-dir">-</strong>
-              <span>Dirección dominante</span>
+              <span>Dirección a la hora elegida</span>
             </div>
             <div class="metric">
               <strong id="daily-max">-</strong>
               <span>Máximo diario</span>
             </div>
-            <div class="metric">
+
+            <div class="metric excel">
+              <strong id="day-mean">-</strong>
+              <span>Velocidad media del día (24 h)</span>
+              <em id="day-force"></em>
+            </div>
+            <div class="metric excel">
+              <strong id="day-dir">-</strong>
+              <span>Dirección media del día (24 h)</span>
+            </div>
+
+            <div class="metric excel">
               <strong id="previous-mean">-</strong>
-              <span>Media velocidad semana anterior</span>
+              <span>Velocidad media semana anterior (7 días)</span>
+              <em id="previous-force"></em>
             </div>
             <div class="metric">
               <strong id="previous-gust">-</strong>
               <span>Media racha semana anterior</span>
             </div>
-            <div class="metric">
+            <div class="metric excel">
               <strong id="previous-dir">-</strong>
-              <span>Dirección dominante semana anterior</span>
+              <span>Dirección media semana anterior (7 días)</span>
             </div>
-            <div class="metric">
+            <div class="metric excel">
               <strong id="weather-state">-</strong>
               <span>Estado del tiempo del día</span>
             </div>
@@ -510,7 +603,10 @@
         </div>
 
         <p class="footnote">
-          Puedes buscar un lugar, elegir un sitio guardado o escribir las coordenadas WGS84 a mano. Para costa o mar, prueba la celda marina o la más cercana.
+          Las tarjetas con borde verde son las que se guardan en la base de datos: el viento del día es la media de las 24 horas, la semana anterior son los 7 días previos y la dirección se expresa en 8 rumbos. Las demás muestran la hora elegida.
+        </p>
+        <p class="footnote">
+          Puedes buscar un lugar, elegir un sitio guardado o escribir las coordenadas WGS84 a mano. Para costa o mar, prueba la celda marina o la más cercana. Datos meteorológicos: Open-Meteo (reanálisis). Mapa base: Esri.
         </p>
       </section>
     </main>
@@ -526,12 +622,20 @@
       const hourInput = document.querySelector("#hour");
       const cellSelectionInput = document.querySelector("#cell-selection");
       const mapLayerInput = document.querySelector("#map-layer");
+      const mapZoomInput = document.querySelector("#map-zoom");
+      const zoomInButton = document.querySelector("#zoom-in");
+      const zoomOutButton = document.querySelector("#zoom-out");
+      const zoomInfo = document.querySelector("#zoom-info");
       const statusText = document.querySelector("#status");
       const speedText = document.querySelector("#wind-speed");
       const gustText = document.querySelector("#wind-gust");
       const dirText = document.querySelector("#wind-dir");
       const dailyMaxText = document.querySelector("#daily-max");
+      const dayMeanText = document.querySelector("#day-mean");
+      const dayForceText = document.querySelector("#day-force");
+      const dayDirText = document.querySelector("#day-dir");
       const previousMeanText = document.querySelector("#previous-mean");
+      const previousForceText = document.querySelector("#previous-force");
       const previousGustText = document.querySelector("#previous-gust");
       const previousDirText = document.querySelector("#previous-dir");
       const weatherStateText = document.querySelector("#weather-state");
@@ -540,10 +644,17 @@
       const mapImage = document.querySelector("#map-image");
       const windArrowPanel = document.querySelector("#wind-arrow-panel");
 
+      const MAP_WIDTH_PX = 1200;
+      const MAP_HEIGHT_PX = 400;
+      const ZOOM_MIN = 8;
+      const ZOOM_MAX = 17;
+      const ZOOM_DEFAULT = 13;
+
       const params = new URLSearchParams(window.location.search);
       let currentPlaceName = params.get("place") || "";
       let latestWindDirection = null;
       let latestPreviousDirection = null;
+      let zoomTimer = null;
 
       for (let hour = 0; hour < 24; hour += 1) {
         const option = document.createElement("option");
@@ -558,9 +669,10 @@
         return date.toISOString().slice(0, 10);
       }
 
+      // Se calcula siempre en UTC para que restar días no dependa de la zona horaria del navegador.
       function addDaysIso(isoDate, days) {
-        const date = new Date(`${isoDate}T00:00:00`);
-        date.setDate(date.getDate() + days);
+        const date = new Date(`${isoDate}T00:00:00Z`);
+        date.setUTCDate(date.getUTCDate() + days);
         return date.toISOString().slice(0, 10);
       }
 
@@ -569,27 +681,52 @@
         return { lat, lon, name: nameParts.join(",") };
       }
 
+      function clampZoom(value) {
+        const zoom = Number(value);
+        if (!Number.isFinite(zoom)) return ZOOM_DEFAULT;
+        return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(zoom)));
+      }
+
+      // Caja del mapa para un nivel de zoom, con la misma escala en horizontal y vertical.
+      function mapBounds(lat, lon, zoom) {
+        const degreesPerPixel = 360 / (256 * Math.pow(2, zoom));
+        const cosLat = Math.cos(lat * Math.PI / 180);
+        const lonHalf = (MAP_WIDTH_PX * degreesPerPixel) / 2;
+        const latHalf = (MAP_HEIGHT_PX * degreesPerPixel * cosLat) / 2;
+        return {
+          bbox: [lon - lonHalf, lat - latHalf, lon + lonHalf, lat + latHalf].join(","),
+          widthKm: MAP_WIDTH_PX * degreesPerPixel * cosLat * 111.32
+        };
+      }
+
+      function formatKm(km) {
+        if (km >= 10) return `${Math.round(km)} km`;
+        if (km >= 1) return `${km.toFixed(1)} km`;
+        return `${Math.round(km * 1000)} m`;
+      }
+
+      function updateZoomLabel(widthKm) {
+        const zoom = clampZoom(mapZoomInput.value);
+        zoomInfo.textContent = widthKm
+          ? `${zoom - ZOOM_MIN + 1} de ${ZOOM_MAX - ZOOM_MIN + 1} · ancho aprox. ${formatKm(widthKm)}`
+          : `${zoom - ZOOM_MIN + 1} de ${ZOOM_MAX - ZOOM_MIN + 1}`;
+      }
+
       function updateMap() {
         const lat = Number(latInput.value);
         const lon = Number(lonInput.value);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
 
-        const latSpan = 0.05;
-        const lonSpan = 0.08;
+        const zoom = clampZoom(mapZoomInput.value);
         const service = mapLayerInput.value === "satellite" ? "World_Imagery" : "World_Street_Map";
-        const bbox = [
-          lon - lonSpan,
-          lat - latSpan,
-          lon + lonSpan,
-          lat + latSpan
-        ].join(",");
+        const bounds = mapBounds(lat, lon, zoom);
 
         const mapUrl = new URL(`https://services.arcgisonline.com/ArcGIS/rest/services/${service}/MapServer/export`);
         mapUrl.search = new URLSearchParams({
-          bbox,
+          bbox: bounds.bbox,
           bboxSR: "4326",
           imageSR: "4326",
-          size: "1200,420",
+          size: `${MAP_WIDTH_PX},${MAP_HEIGHT_PX}`,
           dpi: "96",
           format: "png32",
           transparent: "false",
@@ -597,7 +734,20 @@
         }).toString();
 
         mapImage.src = mapUrl.toString();
+        updateZoomLabel(bounds.widthKm);
         updateWindArrows(lat, lon, latestWindDirection, latestPreviousDirection);
+      }
+
+      function setZoom(value, immediate) {
+        mapZoomInput.value = String(clampZoom(value));
+        updateZoomLabel(null);
+        window.clearTimeout(zoomTimer);
+        if (immediate) {
+          updateMap();
+        } else {
+          zoomTimer = window.setTimeout(updateMap, 200);
+        }
+        updatePermalinkIfReady();
       }
 
       function arrowMarkup(direction, label, className) {
@@ -679,11 +829,30 @@
         return true;
       }
 
+      // Rosa de 16 rumbos, para la hora elegida.
       function compassLabel(degrees) {
         if (degrees === null || degrees === undefined || Number.isNaN(degrees)) return "-";
         const directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
         const index = Math.round((degrees % 360) / 22.5) % 16;
         return `${directions[index]} (${Math.round(degrees)} deg)`;
+      }
+
+      // Rosa de 8 rumbos, la misma que usa la base de datos.
+      function compassLabel8(degrees) {
+        if (degrees === null || degrees === undefined || Number.isNaN(degrees)) return "-";
+        const directions = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+        const index = Math.round(degrees / 45) % 8;
+        return `${directions[index]} (${Math.round(degrees)} deg)`;
+      }
+
+      // Mismos umbrales que la base de datos.
+      function forceLabel(speed) {
+        if (speed === null || speed === undefined || Number.isNaN(Number(speed))) return "";
+        const value = Number(speed);
+        if (value < 10) return "Calma / flojo";
+        if (value < 25) return "Moderado";
+        if (value < 40) return "Fuerte";
+        return "Muy fuerte";
       }
 
       function formatSpeed(value) {
@@ -734,9 +903,14 @@
           hour: hourInput.value,
           cell: cellSelectionInput.value,
           layer: mapLayerInput.value,
+          zoom: String(clampZoom(mapZoomInput.value)),
           place: selectedPlaceName()
         });
         window.history.replaceState({}, "", `${window.location.pathname}?${next.toString()}`);
+      }
+
+      function updatePermalinkIfReady() {
+        if (latInput.value && lonInput.value && dateInput.value) updatePermalink();
       }
 
       function setFromQueryString() {
@@ -759,8 +933,9 @@
 
         dateInput.value = date || todayIso();
         hourInput.value = hour || "12";
-        cellSelectionInput.value = cell || "land";
+        cellSelectionInput.value = cell || "nearest";
         mapLayerInput.value = layer || "street";
+        mapZoomInput.value = String(clampZoom(params.get("zoom") || ZOOM_DEFAULT));
         updateMap();
       }
 
@@ -771,7 +946,11 @@
         gustText.textContent = "-";
         dirText.textContent = "-";
         dailyMaxText.textContent = "-";
+        dayMeanText.textContent = "-";
+        dayForceText.textContent = "";
+        dayDirText.textContent = "-";
         previousMeanText.textContent = "-";
+        previousForceText.textContent = "";
         previousGustText.textContent = "-";
         previousDirText.textContent = "-";
         weatherStateText.textContent = "-";
@@ -921,8 +1100,15 @@
           const previousSpeeds = previousRows.map((row) => data.hourly.wind_speed_10m[row.itemIndex]);
           const previousGusts = previousRows.map((row) => data.hourly.wind_gusts_10m[row.itemIndex]);
           const previousDirections = previousRows.map((row) => data.hourly.wind_direction_10m[row.itemIndex]);
+          const daySpeeds = dayRows.map((row) => data.hourly.wind_speed_10m[row.itemIndex]);
+          const dayDirections = dayRows.map((row) => data.hourly.wind_direction_10m[row.itemIndex]);
           const dailyIndex = data.daily.time.findIndex((time) => time === selectedDate);
+
           const previousDominantDirection = circularMeanDirection(previousDirections, previousSpeeds);
+          const dayMeanDirection = circularMeanDirection(dayDirections, daySpeeds);
+          const dayMeanSpeed = average(daySpeeds);
+          const previousMeanSpeed = average(previousSpeeds);
+
           latestWindDirection = data.hourly.wind_direction_10m[index];
           latestPreviousDirection = previousDominantDirection;
 
@@ -930,13 +1116,20 @@
           gustText.textContent = formatSpeed(data.hourly.wind_gusts_10m[index]);
           dirText.textContent = compassLabel(data.hourly.wind_direction_10m[index]);
           dailyMaxText.textContent = formatSpeed(data.daily.wind_speed_10m_max[dailyIndex]);
-          previousMeanText.textContent = formatSpeed(average(previousSpeeds));
+
+          dayMeanText.textContent = formatSpeed(dayMeanSpeed);
+          dayForceText.textContent = forceLabel(dayMeanSpeed);
+          dayDirText.textContent = compassLabel8(dayMeanDirection);
+
+          previousMeanText.textContent = formatSpeed(previousMeanSpeed);
+          previousForceText.textContent = forceLabel(previousMeanSpeed);
           previousGustText.textContent = formatSpeed(average(previousGusts));
-          previousDirText.textContent = compassLabel(previousDominantDirection);
+          previousDirText.textContent = compassLabel8(previousDominantDirection);
+
           weatherStateText.textContent = dailyWeatherLabel(data, dailyIndex, dayRows);
           updateMap();
           renderRows(data.hourly, selectedHour, selectedDate);
-          setStatus(`${selectedPlaceName()} - ${selectedDate} - ${selectedHour}:00 hora local. Media calculada con ${previousRows.length} horas de la semana anterior.`);
+          setStatus(`${selectedPlaceName()} - ${selectedDate} - ${selectedHour}:00 hora local. Semana anterior calculada con ${previousRows.length} horas.`);
           updatePermalink();
         } catch (error) {
           setStatus(`No se pudo consultar el viento: ${error.message}`, true);
@@ -950,7 +1143,13 @@
       });
       latInput.addEventListener("input", setCustomCoordinates);
       lonInput.addEventListener("input", setCustomCoordinates);
-      mapLayerInput.addEventListener("change", updateMap);
+      mapLayerInput.addEventListener("change", () => {
+        updateMap();
+        updatePermalinkIfReady();
+      });
+      mapZoomInput.addEventListener("input", () => setZoom(mapZoomInput.value, false));
+      zoomInButton.addEventListener("click", () => setZoom(Number(mapZoomInput.value) + 1, true));
+      zoomOutButton.addEventListener("click", () => setZoom(Number(mapZoomInput.value) - 1, true));
       searchLocationButton.addEventListener("click", searchLocation);
       locationQueryInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
